@@ -2,88 +2,56 @@ package main
 
 import (
 	"database/sql"
-	"forum/auth_service/internal/config"
-	"forum/auth_service/internal/delivery/http"
-	"forum/auth_service/internal/repository"
-	"forum/auth_service/internal/usecase"
-	"forum/auth_service/internal/utils"
-	"github.com/gin-contrib/cors"
+	"fmt"
+	"github.com/Engls/forum-project2/auth_service/internal/config"
+	"github.com/Engls/forum-project2/auth_service/internal/delivery/http"
+	"github.com/Engls/forum-project2/auth_service/internal/repository"
+	"github.com/Engls/forum-project2/auth_service/internal/usecase"
 	"github.com/gin-gonic/gin"
-	"github.com/jmoiron/sqlx"
+	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/database/sqlite3"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 	_ "github.com/mattn/go-sqlite3"
-	"go.uber.org/zap"
+	"log"
 )
 
 func main() {
-	logger, _ := zap.NewProduction()
-	defer logger.Sync()
-
-	cfg := config.LoadConfig()
-
-	db, err := sqlx.Connect("sqlite3", cfg.DBPath)
+	cfg, err := config.LoadConfig()
 	if err != nil {
-		logger.Fatal("Failed to connect to DataBase", zap.Error(err))
+		log.Fatalf("Failed to load config: %v", err)
+	}
+
+	db, err := sql.Open("sqlite3", cfg.DBPath)
+	if err != nil {
+		log.Fatalf("Failed to connect to database: %v", err)
 	}
 	defer db.Close()
 
-	// Выполнение миграций программно
-	err = performMigrations(db.DB)
+	// --- Миграции ---
+	driver, err := sqlite3.WithInstance(db, &sqlite3.Config{})
 	if err != nil {
-		logger.Fatal("Failed to perform migrations", zap.Error(err))
+		log.Fatalf("Failed to create migrate driver: %v", err)
 	}
-
-	authRepo := repository.NewAuthRepository(db)
-	jwtUtil := utils.NewJWTUtil(cfg.JWTSecret)
-	authUsecase := usecase.NewAuthUsecase(authRepo, jwtUtil)
-	authHandler := http.NewAuthHandler(authUsecase)
-
-	r := gin.Default()
-	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:3000"},
-		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
-		ExposeHeaders:    []string{"Content-Length"},
-		AllowCredentials: true,
-	}))
-
-	r.POST("/register", authHandler.Register)
-	r.POST("/login", authHandler.Login)
-
-	if err := r.Run(":8080"); err != nil {
-		logger.Fatal("Failed to run server", zap.Error(err))
-	}
-}
-
-// performMigrations выполняет миграции программно
-func performMigrations(db *sql.DB) error {
-	// SQL для создания таблицы users
-	createUserTable := `
-	CREATE TABLE IF NOT EXISTS users (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		username TEXT NOT NULL UNIQUE,
-		password TEXT NOT NULL,
-		role TEXT NOT NULL DEFAULT 'user'
-	);`
-
-	// SQL для создания таблицы tokens
-	createTokenTable := `
-	CREATE TABLE IF NOT EXISTS tokens (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		user_id INTEGER NOT NULL,
-		token TEXT NOT NULL,
-		FOREIGN KEY (user_id) REFERENCES users(id)
-	);`
-
-	// Выполнение SQL запросов
-	_, err := db.Exec(createUserTable)
+	m, err := migrate.NewWithDatabaseInstance(
+		"file://"+cfg.MigrationsPath,
+		"sqlite3", driver)
 	if err != nil {
-		return err
+		log.Fatalf("Failed to create migrate instance: %v", err)
 	}
-
-	_, err = db.Exec(createTokenTable)
-	if err != nil {
-		return err
+	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+		log.Fatalf("Failed to apply migrations: %v", err)
 	}
+	fmt.Println("Миграции успешно применены!")
+	// --- Конец миграций ---
 
-	return nil
+	userRepo := repository.NewUserRepository(db)
+	userUsecase := usecase.NewAuthUsecase(userRepo, cfg.JWTSecret)
+	authHandler := http.NewAuthHandler(userUsecase)
+
+	router := gin.Default()
+	authHandler.RegisterRoutes(router)
+
+	if err := router.Run(cfg.Port); err != nil {
+		log.Fatalf("Failed to start server: %v", err)
+	}
 }

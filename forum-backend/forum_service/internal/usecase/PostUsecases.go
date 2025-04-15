@@ -2,8 +2,8 @@ package usecase
 
 import (
 	"context"
-	"forum-project/forum_service/internal/entity"
-	"forum-project/forum_service/internal/repository"
+	"github.com/Engls/forum-project2/forum_service/internal/entity"
+	"github.com/Engls/forum-project2/forum_service/internal/repository"
 )
 
 type PostUsecase interface {

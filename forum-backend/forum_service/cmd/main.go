@@ -2,73 +2,57 @@ package main
 
 import (
 	"database/sql"
-	"forum-project/forum_service/internal/config"
-	"forum-project/forum_service/internal/controllers/http"
-	"forum-project/forum_service/internal/repository"
-	"forum-project/forum_service/internal/usecase"
-	"github.com/gin-contrib/cors"
+	"fmt"
+	"log"
+
+	"github.com/Engls/forum-project2/forum_service/internal/config"
+	"github.com/Engls/forum-project2/forum_service/internal/controllers/http"
+	"github.com/Engls/forum-project2/forum_service/internal/repository"
+	"github.com/Engls/forum-project2/forum_service/internal/usecase"
 	"github.com/gin-gonic/gin"
-	"github.com/jmoiron/sqlx"
+	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/database/sqlite3"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 	_ "github.com/mattn/go-sqlite3"
-	"go.uber.org/zap"
 )
 
 func main() {
-	logger, _ := zap.NewProduction()
-	defer logger.Sync()
-
-	cfg := config.LoadConfig()
-
-	db, err := sqlx.Connect("sqlite3", cfg.DBPath)
+	cfg, err := config.LoadConfig()
 	if err != nil {
-		logger.Fatal("Failed to connect to DataBase", zap.Error(err))
+		log.Fatalf("Failed to load config: %v", err)
+	}
+
+	db, err := sql.Open("sqlite3", cfg.DBPath)
+	if err != nil {
+		log.Fatalf("Failed to connect to database: %v", err)
 	}
 	defer db.Close()
 
-	// Выполнение миграций программно
-	err = performMigrations(db.DB)
+	// --- Миграции ---
+	driver, err := sqlite3.WithInstance(db, &sqlite3.Config{})
 	if err != nil {
-		logger.Fatal("Failed to perform migrations", zap.Error(err))
+		log.Fatalf("Failed to create migrate driver: %v", err)
 	}
+	m, err := migrate.NewWithDatabaseInstance(
+		"file://"+cfg.MigrationsPath,
+		"sqlite3", driver)
+	if err != nil {
+		log.Fatalf("Failed to create migrate instance: %v", err)
+	}
+	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+		log.Fatalf("Failed to apply migrations: %v", err)
+	}
+	fmt.Println("Миграции успешно применены!")
+	// --- Конец миграций ---
 
 	postRepo := repository.NewPostRepository(db)
-	postUsecase := usecase.NewPostUsecases(postRepo)
-	postHandler := http.NewPostHandler(postUsecase, postRepo)
+	postUsecase := usecase.NewPostUsecase(postRepo)
+	postHandler := http.NewPostHandler(postUsecase)
 
-	r := gin.Default()
-	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:3000"},
-		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
-		ExposeHeaders:    []string{"Content-Length"},
-		AllowCredentials: true,
-	}))
+	router := gin.Default()
+	postHandler.RegisterRoutes(router)
 
-	r.POST("/posts", postHandler.CreatePost)
-	r.GET("/posts", postHandler.GetPosts)
-
-	if err := r.Run(":8081"); err != nil {
-		logger.Fatal("Failed to run server", zap.Error(err))
+	if err := router.Run(cfg.Port); err != nil {
+		log.Fatalf("Failed to start server: %v", err)
 	}
-}
-
-// performMigrations выполняет миграции программно
-func performMigrations(db *sql.DB) error {
-	// SQL для создания таблицы posts
-	createPostTable := `
-	CREATE TABLE IF NOT EXISTS posts (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		author_id INTEGER NOT NULL,
-		title TEXT NOT NULL,
-		content TEXT NOT NULL,
-		FOREIGN KEY (author_id) REFERENCES users(id)
-	);`
-
-	// Выполнение SQL запросов
-	_, err := db.Exec(createPostTable)
-	if err != nil {
-		return err
-	}
-
-	return nil
 }

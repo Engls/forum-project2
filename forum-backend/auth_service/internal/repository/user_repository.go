@@ -1,7 +1,7 @@
 package repository
 
 import (
-	"forum/auth_service/internal/entity"
+	"github.com/Engls/forum-project2/auth_service/internal/entity"
 	"github.com/jmoiron/sqlx"
 )
 

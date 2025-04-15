@@ -2,26 +2,34 @@ package config
 
 import (
 	"os"
-	"path/filepath"
+
+	"github.com/joho/godotenv"
 )
 
 type Config struct {
-	DBPath    string
-	JWTSecret string
+	Port           string
+	DBPath         string
+	JWTSecret      string
+	MigrationsPath string // Добавляем путь к миграциям
 }
 
-func LoadConfig() Config {
-	// Получаем текущую директорию
-	dir, err := os.Getwd()
-	if err != nil {
-		panic(err)
+func LoadConfig() (*Config, error) {
+	godotenv.Load()
+
+	cfg := &Config{
+		Port:           getEnv("AUTH_SERVICE_PORT", ":8080"),
+		DBPath:         getEnv("AUTH_SERVICE_DB_PATH", "auth.db"),
+		JWTSecret:      getEnv("JWT_SECRET", "secret"),
+		MigrationsPath: getEnv("AUTH_SERVICE_MIGRATIONS_PATH", "migrations"), // Получаем путь из переменной окружения
 	}
 
-	// Формируем абсолютный путь к общей базе данных
-	dbPath := filepath.Join(dir, "..", "forum.db")
+	return cfg, nil
+}
 
-	return Config{
-		DBPath:    dbPath, // Абсолютный путь к общей базе данных
-		JWTSecret: "your_jwt_secret",
+func getEnv(key, defaultValue string) string {
+	value := os.Getenv(key)
+	if value == "" {
+		return defaultValue
 	}
+	return value
 }

@@ -1,7 +1,7 @@
 package http
 
 import (
-	"forum/auth_service/internal/usecase"
+	"github.com/Engls/forum-project2/auth_service/internal/usecase"
 	"net/http"
 
 	"github.com/gin-gonic/gin"

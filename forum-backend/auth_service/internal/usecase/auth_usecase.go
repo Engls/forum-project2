@@ -2,9 +2,9 @@ package usecase
 
 import (
 	"errors"
-	"forum/auth_service/internal/entity"
-	"forum/auth_service/internal/repository"
-	"forum/auth_service/internal/utils"
+	"github.com/Engls/forum-project2/auth_service/internal/entity"
+	"github.com/Engls/forum-project2/auth_service/internal/repository"
+	"github.com/Engls/forum-project2/auth_service/internal/utils"
 	"golang.org/x/crypto/bcrypt"
 )
 

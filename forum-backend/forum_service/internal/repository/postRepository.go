@@ -2,7 +2,7 @@ package repository
 
 import (
 	"context"
-	"forum-project/forum_service/internal/entity"
+	"github.com/Engls/forum-project2/forum_service/internal/entity"
 	"github.com/jmoiron/sqlx"
 )
 

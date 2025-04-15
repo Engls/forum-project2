@@ -1,9 +1,9 @@
 package http
 
 import (
-	"forum-project/forum_service/internal/entity"
-	"forum-project/forum_service/internal/repository"
-	"forum-project/forum_service/internal/usecase"
+	"github.com/Engls/forum-project2/forum_service/internal/entity"
+	"github.com/Engls/forum-project2/forum_service/internal/repository"
+	"github.com/Engls/forum-project2/forum_service/internal/usecase"
 	"github.com/gin-gonic/gin"
 	"net/http"
 	"strings"
