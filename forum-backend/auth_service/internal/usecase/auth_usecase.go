@@ -8,16 +8,21 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-type AuthUsecase struct {
-	authRepo *repository.AuthRepository
+type AuthUsecase interface {
+	Register(username, password, role string) error
+	Login(username, password string) (string, error)
+}
+
+type authUsecase struct {
+	authRepo repository.AuthRepository
 	jwtUtil  *utils.JWTUtil
 }
 
-func NewAuthUsecase(authRepo *repository.AuthRepository, jwtUtil *utils.JWTUtil) *AuthUsecase {
-	return &AuthUsecase{authRepo: authRepo, jwtUtil: jwtUtil}
+func NewAuthUsecase(authRepo repository.AuthRepository, jwtUtil *utils.JWTUtil) AuthUsecase {
+	return &authUsecase{authRepo: authRepo, jwtUtil: jwtUtil}
 }
 
-func (u *AuthUsecase) Register(username, password, role string) error {
+func (u *authUsecase) Register(username, password, role string) error {
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return err
@@ -26,7 +31,7 @@ func (u *AuthUsecase) Register(username, password, role string) error {
 	return u.authRepo.Register(user)
 }
 
-func (u *AuthUsecase) Login(username, password string) (string, error) {
+func (u *authUsecase) Login(username, password string) (string, error) {
 	user, err := u.authRepo.GetUserByUsername(username)
 	if err != nil {
 		return "", errors.New("invalid credentials")

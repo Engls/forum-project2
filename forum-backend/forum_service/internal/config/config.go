@@ -9,22 +9,27 @@ import (
 type Config struct {
 	Port           string
 	DBPath         string
-	MigrationsPath string // Добавляем путь к миграциям
+	MigrationsPath string
+	JWTSecret      string
 }
 
-func LoadConfig() (*Config, error) {
-	godotenv.Load()
+func LoadConfig() (Config, error) {
 
-	cfg := &Config{
-		Port:           getEnv("FORUM_SERVICE_PORT", ":8081"),
-		DBPath:         getEnv("FORUM_SERVICE_DB_PATH", "forum.db"),
-		MigrationsPath: getEnv("FORUM_SERVICE_MIGRATIONS_PATH", "migrations"), // Получаем путь из переменной окружения
+	err := godotenv.Load()
+	if err != nil {
+
 	}
 
+	cfg := Config{
+		Port:           getEnv("AUTH_SERVICE_PORT", ":8081"),
+		DBPath:         getEnv("DB_PATH", "../../db/forum.db"),
+		MigrationsPath: getEnv("AUTH_SERVICE_MIGRATIONS_PATH", "C:\\forum-project\\forum-backend\\auth_service\\migrations"),
+		JWTSecret:      getEnv("JWT_SECRET", "your-secret-key"),
+	}
 	return cfg, nil
 }
 
-func getEnv(key, defaultValue string) string {
+func getEnv(key string, defaultValue string) string {
 	value := os.Getenv(key)
 	if value == "" {
 		return defaultValue

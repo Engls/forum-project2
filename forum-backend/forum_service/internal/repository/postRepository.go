@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"fmt"
 	"github.com/Engls/forum-project2/forum_service/internal/entity"
 	"github.com/jmoiron/sqlx"
 )
@@ -79,8 +80,10 @@ func (r *postRepository) DeletePost(ctx context.Context, id int) error {
 
 func (r *postRepository) GetUserIDByToken(ctx context.Context, token string) (int, error) {
 	query := `SELECT user_id FROM tokens WHERE token = ?`
+	fmt.Println(token)
 	var userID int
 	err := r.db.GetContext(ctx, &userID, query, token)
+	fmt.Println(err)
 	if err != nil {
 		return 0, err
 	}

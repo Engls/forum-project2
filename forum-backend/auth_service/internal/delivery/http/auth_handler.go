@@ -8,10 +8,10 @@ import (
 )
 
 type AuthHandler struct {
-	authUsecase *usecase.AuthUsecase
+	authUsecase usecase.AuthUsecase
 }
 
-func NewAuthHandler(authUsecase *usecase.AuthUsecase) *AuthHandler {
+func NewAuthHandler(authUsecase usecase.AuthUsecase) *AuthHandler {
 	return &AuthHandler{authUsecase: authUsecase}
 }
 

@@ -40,7 +40,12 @@ const Register = () => {
 
     const handleRegister = async () => {
         try {
-            const response = await axios.post('http://localhost:8080/register', { username, password });
+            const response = await axios.post('http://localhost:8080/register', 
+              { 
+                username: username,
+                 password: password,
+                 role: "user",
+                 });
             localStorage.setItem('token', response.data.token);
             navigate('/Login');
         } catch (error) {

@@ -1,19 +1,19 @@
 package main
 
 import (
-	"database/sql"
 	"fmt"
-	"log"
-
 	"github.com/Engls/forum-project2/forum_service/internal/config"
 	"github.com/Engls/forum-project2/forum_service/internal/controllers/http"
 	"github.com/Engls/forum-project2/forum_service/internal/repository"
 	"github.com/Engls/forum-project2/forum_service/internal/usecase"
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	"github.com/golang-migrate/migrate/v4"
-	"github.com/golang-migrate/migrate/v4/database/sqlite3"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
+	"github.com/jmoiron/sqlx"
 	_ "github.com/mattn/go-sqlite3"
+	"log"
+	"os"
+	"time"
 )
 
 func main() {
@@ -21,36 +21,28 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
-
-	db, err := sql.Open("sqlite3", cfg.DBPath)
+	fmt.Println(os.Getwd())
+	db, err := sqlx.Open("sqlite3", cfg.DBPath)
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 	defer db.Close()
 
-	// --- Миграции ---
-	driver, err := sqlite3.WithInstance(db, &sqlite3.Config{})
-	if err != nil {
-		log.Fatalf("Failed to create migrate driver: %v", err)
-	}
-	m, err := migrate.NewWithDatabaseInstance(
-		"file://"+cfg.MigrationsPath,
-		"sqlite3", driver)
-	if err != nil {
-		log.Fatalf("Failed to create migrate instance: %v", err)
-	}
-	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
-		log.Fatalf("Failed to apply migrations: %v", err)
-	}
-	fmt.Println("Миграции успешно применены!")
-	// --- Конец миграций ---
-
 	postRepo := repository.NewPostRepository(db)
 	postUsecase := usecase.NewPostUsecase(postRepo)
-	postHandler := http.NewPostHandler(postUsecase)
+	postHandler := http.NewPostHandler(postUsecase, postRepo)
 
 	router := gin.Default()
-	postHandler.RegisterRoutes(router)
+	router.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"http://localhost:3000"},
+		AllowMethods:     []string{"PUT", "PATCH", "POST", "GET"},
+		AllowHeaders:     []string{"Content-type", "Origin", "Authorization"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+		MaxAge:           12 * time.Hour,
+	}))
+	router.POST("/posts", postHandler.CreatePost)
+	router.GET("/posts", postHandler.GetPosts)
 
 	if err := router.Run(cfg.Port); err != nil {
 		log.Fatalf("Failed to start server: %v", err)

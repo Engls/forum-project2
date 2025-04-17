@@ -1,6 +1,7 @@
 package http
 
 import (
+	"fmt"
 	"github.com/Engls/forum-project2/forum_service/internal/entity"
 	"github.com/Engls/forum-project2/forum_service/internal/repository"
 	"github.com/Engls/forum-project2/forum_service/internal/usecase"
@@ -22,18 +23,21 @@ func (h *PostHandler) CreatePost(c *gin.Context) {
 	authHeader := c.GetHeader("Authorization")
 	if authHeader == "" {
 		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Authorization header required"})
+		fmt.Println("Authorization header required")
 		return
 	}
 
 	tokenString := strings.Replace(authHeader, "Bearer ", "", 1)
 	if tokenString == authHeader {
 		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid Authorization header format"})
+		fmt.Println("Invalid Authorization header format")
 		return
 	}
 
 	userID, err := h.postRepo.GetUserIDByToken(c.Request.Context(), tokenString)
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
+		fmt.Println("Invalid token")
 		return
 	}
 

@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="SqlDialectMappings">
+    <file url="file://$PROJECT_DIR$/forum-backend/auth_service/migrations/001_create_user_table.up.sql" dialect="SQLite" />
+    <file url="file://$PROJECT_DIR$/forum-backend/auth_service/migrations/003_create_posts_table.up.sql" dialect="SQLite" />
     <file url="file://$PROJECT_DIR$/forum-backend/forum_service/internal/repository/postRepository.go" dialect="GenericSQL" />
-    <file url="file://$PROJECT_DIR$/forum-backend/migrations/000002_add_post_table.up.sql" dialect="SQLite" />
   </component>
 </project>
