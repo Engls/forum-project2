@@ -5,6 +5,8 @@ import Register from './components/Auth/Register';
 import PostList from './components/Posts/PostList';
 import CreatePost from './components/Posts/CreatePost';
 import MainLayout from './components/Layout/MainLayout';
+import Chat from './components/Chat/chat'; // Импортируем компонент чата
+import { AuthProvider, useAuth } from './components/Chat/AuthContext'; // Импортируем AuthProvider
 import styled from 'styled-components';
 
 const AppContainer = styled.div`
@@ -12,8 +14,8 @@ const AppContainer = styled.div`
 `;
 
 const PrivateRoute = ({ children }) => {
-    const token = localStorage.getItem('token');
-    return token ? children : <Navigate to="/login" />;
+    const { isAuthenticated } = useAuth();
+    return children;
 };
 
 const App = () => {
@@ -22,23 +24,26 @@ const App = () => {
     };
 
     return (
-        <AppContainer>
-            <Router>
-                <MainLayout>
-                    <Routes>
-                        <Route path="/login" element={<Login />} />
-                        <Route path="/register" element={<Register />} />
-                        <Route path="/posts" element={
-                            <PrivateRoute>
-                                <CreatePost onPostCreated={onPostCreated} />
-                                <PostList />
-                            </PrivateRoute>
-                        } />
-                        <Route path="/" element={<Navigate to="/login" />} />
-                    </Routes>
-                </MainLayout>
-            </Router>
-        </AppContainer>
+        <AuthProvider>
+            <AppContainer>
+                <Router>
+                    <MainLayout>
+                        <Routes>
+                            <Route path="/login" element={<Login />} />
+                            <Route path="/register" element={<Register />} />
+                            <Route path="/posts" element={
+                                <PrivateRoute>
+                                    <CreatePost onPostCreated={onPostCreated} />
+                                    <PostList />
+                                </PrivateRoute>
+                            } />
+                            <Route path="/" element={<Navigate to="/login" />} />
+                        </Routes>
+                        <Chat /> {/* Включаем компонент чата */}
+                    </MainLayout>
+                </Router>
+            </AppContainer>
+        </AuthProvider>
     );
 };
 

@@ -1,6 +1,7 @@
 import React from 'react';
 import styled from 'styled-components';
 import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../Chat/AuthContext'; // Импортируем useAuth
 
 const Nav = styled.nav`
   background-color:rgb(24, 255, 16);
@@ -31,10 +32,10 @@ const NavLinks = styled.div`
 
 const Navbar = () => {
     const navigate = useNavigate();
-    const isLoggedIn = localStorage.getItem('token') !== null;
+    const { isAuthenticated, logout } = useAuth(); // Используем useAuth для получения состояния аутентификации и метода logout
 
     const handleLogout = () => {
-        localStorage.removeItem('token');
+        logout();
         navigate('/login');
     };
 
@@ -42,7 +43,7 @@ const Navbar = () => {
         <Nav>
             <NavTitle>MyForumGo</NavTitle>
             <NavLinks>
-                {isLoggedIn ? (
+                {isAuthenticated ? (
                     <>
                         <Link to="/posts">Posts</Link>
                         <Link to="#" onClick={handleLogout}>Logout</Link>

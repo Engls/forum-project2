@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import styled from 'styled-components';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../Chat/AuthContext'; // Импортируем useAuth
 
 const LoginContainer = styled.div`
   display: flex;
@@ -37,11 +38,17 @@ const Login = () => {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const navigate = useNavigate();
+    const { login } = useAuth(); // Используем useAuth для получения метода login
 
     const handleLogin = async () => {
         try {
             const response = await axios.post('http://localhost:8080/login', { username, password });
-            localStorage.setItem('token', response.data.token);
+            login(response.data.token, {
+              id: response.data.userID, // Проверьте что здесь число
+              username: response.data.username,
+              role: response.data.role,
+              token: response.data.token
+          }); // Вызываем метод login
             navigate('/posts');
         } catch (error) {
             console.error('Login failed:', error);
