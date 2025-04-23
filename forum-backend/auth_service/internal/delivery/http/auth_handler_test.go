@@ -3,7 +3,9 @@ package http
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	utils "github.com/Engls/EnglsJwt"
+	"github.com/Engls/forum-project2/auth_service/internal/entity"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -16,7 +18,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func TestAuthHandler_Register(t *testing.T) {
+func TestAuthHandler_Register_Success(t *testing.T) {
 	// Инициализация логгера
 	logger, _ := zap.NewProduction()
 
@@ -50,6 +52,72 @@ func TestAuthHandler_Register(t *testing.T) {
 	assert.Contains(t, w.Body.String(), "User registered successfully")
 
 	// Проверка вызовов мока
+	mockAuthUsecase.AssertExpectations(t)
+}
+
+func TestAuthHandler_Register_Failure(t *testing.T) {
+	// Инициализация логгера
+	logger, _ := zap.NewProduction()
+
+	// Создание моков
+	mockAuthUsecase := new(mocks.AuthUsecase)
+	jwtUtil := utils.NewJWTUtil("secret")
+
+	// Тестовые данные
+	req := entity.RegisterRequest{
+		Username: "testuser",
+		Password: "password",
+		Role:     "user",
+	}
+
+	// Настройка моков
+	mockAuthUsecase.On("Register", req.Username, req.Password, req.Role).Return(errors.New("failed to register user"))
+
+	// Инициализация хендлера
+	authHandler := NewAuthHandler(mockAuthUsecase, jwtUtil, logger)
+
+	// Создание Gin контекста
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPost, "/register", bytes.NewBufferString(`{"username":"testuser","password":"password","role":"user"}`))
+	c.Request.Header.Set("Content-Type", "application/json")
+
+	// Вызов метода Register
+	authHandler.Register(c)
+
+	// Проверка результата
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+	assert.Contains(t, w.Body.String(), "failed to register user")
+
+	// Проверка вызовов моков
+	mockAuthUsecase.AssertExpectations(t)
+}
+
+func TestAuthHandler_Register_BadRequest(t *testing.T) {
+	// Инициализация логгера
+	logger, _ := zap.NewProduction()
+
+	// Создание моков
+	mockAuthUsecase := new(mocks.AuthUsecase)
+	jwtUtil := utils.NewJWTUtil("secret")
+
+	// Инициализация хендлера
+	authHandler := NewAuthHandler(mockAuthUsecase, jwtUtil, logger)
+
+	// Создание Gin контекста
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPost, "/register", bytes.NewBufferString(`{"{"username":"testuser","password":"","role":""}`))
+	c.Request.Header.Set("Content-Type", "application/json")
+
+	// Вызов метода Register
+	authHandler.Register(c)
+
+	// Проверка результата
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Contains(t, w.Body.String(), "error")
+
+	// Проверка вызовов моков
 	mockAuthUsecase.AssertExpectations(t)
 }
 
@@ -89,5 +157,82 @@ func TestAuthHandler_Login(t *testing.T) {
 	assert.Contains(t, w.Body.String(), "token")
 
 	// Проверка вызовов мока
+	mockAuthUsecase.AssertExpectations(t)
+}
+
+func TestAuthHandler_Login_Failure(t *testing.T) {
+	// Инициализация логгера
+	logger, _ := zap.NewProduction()
+
+	// Создание моков
+	mockAuthUsecase := new(mocks.AuthUsecase)
+	jwtUtil := utils.NewJWTUtil("secret")
+
+	// Тестовые данные
+	req := entity.LoginRequest{
+		Username: "testuser",
+		Password: "password",
+	}
+
+	// Настройка моков
+	mockAuthUsecase.On("Login", req.Username, req.Password).Return("", errors.New("invalid credentials"))
+
+	// Инициализация хендлера
+	authHandler := NewAuthHandler(mockAuthUsecase, jwtUtil, logger)
+
+	// Создание Gin контекста
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPost, "/login", bytes.NewBufferString(`{"username":"testuser","password":"password"}`))
+	c.Request.Header.Set("Content-Type", "application/json")
+
+	// Вызов метода Login
+	authHandler.Login(c)
+
+	// Проверка результата
+	assert.Equal(t, http.StatusUnauthorized, w.Code)
+	assert.Contains(t, w.Body.String(), "invalid credentials")
+
+	// Проверка вызовов моков
+	mockAuthUsecase.AssertExpectations(t)
+}
+
+func TestAuthHandler_Login_GetUserIDFromTokenFailure(t *testing.T) {
+	// Инициализация логгера
+	logger, _ := zap.NewProduction()
+
+	// Создание моков
+	mockAuthUsecase := new(mocks.AuthUsecase)
+	jwtUtil := utils.NewJWTUtil("secret")
+
+	// Тестовые данные
+	req := entity.LoginRequest{
+		Username: "testuser",
+		Password: "password",
+	}
+	token := "invalid.jwt.token"
+	role := "user"
+
+	// Настройка моков
+	mockAuthUsecase.On("Login", req.Username, req.Password).Return(token, nil)
+	mockAuthUsecase.On("GetUserRole", req.Username).Return(role, nil)
+
+	// Инициализация хендлера
+	authHandler := NewAuthHandler(mockAuthUsecase, jwtUtil, logger)
+
+	// Создание Gin контекста
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPost, "/login", bytes.NewBufferString(`{"username":"testuser","password":"password"}`))
+	c.Request.Header.Set("Content-Type", "application/json")
+
+	// Вызов метода Login
+	authHandler.Login(c)
+
+	// Проверка результата
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+	assert.Contains(t, w.Body.String(), "invalid character")
+
+	// Проверка вызовов моков
 	mockAuthUsecase.AssertExpectations(t)
 }

@@ -192,3 +192,217 @@ func TestPostRepository_GetPostByID_Failure(t *testing.T) {
 	// Проверка вызовов моков
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
+
+func TestPostRepository_UpdatePost_Success(t *testing.T) {
+	// Инициализация логгера
+	logger, _ := zap.NewProduction()
+
+	// Создание моков
+	db, mock, err := sqlmock.New()
+	assert.NoError(t, err)
+	defer db.Close()
+
+	// Создание адаптера
+	dbAdapter := &adapters.DbAdapter{DB: db}
+
+	// Инициализация репозитория
+	postRepo := NewPostRepository(dbAdapter, logger)
+
+	// Тестовые данные
+	post := entity.Post{
+		ID:       1,
+		AuthorId: 1,
+		Title:    "Updated Post",
+		Content:  "This is an updated post",
+	}
+
+	// Настройка моков
+	mock.ExpectExec(`UPDATE posts SET title = \?, content = \? WHERE id = \?`).
+		WithArgs(post.Title, post.Content, post.ID).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+
+	// Вызов метода
+	result, err := postRepo.UpdatePost(context.Background(), post)
+
+	// Проверка результата
+	assert.NoError(t, err)
+	assert.Equal(t, &post, result)
+
+	// Проверка вызовов моков
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestPostRepository_UpdatePost_Failure(t *testing.T) {
+	// Инициализация логгера
+	logger, _ := zap.NewProduction()
+
+	// Создание моков
+	db, mock, err := sqlmock.New()
+	assert.NoError(t, err)
+	defer db.Close()
+
+	// Создание адаптера
+	dbAdapter := &adapters.DbAdapter{DB: db}
+
+	// Инициализация репозитория
+	postRepo := NewPostRepository(dbAdapter, logger)
+
+	// Тестовые данные
+	post := entity.Post{
+		ID:       1,
+		AuthorId: 1,
+		Title:    "Updated Post",
+		Content:  "This is an updated post",
+	}
+
+	// Настройка моков
+	mock.ExpectExec(`UPDATE posts SET title = \?, content = \? WHERE id = \?`).
+		WithArgs(post.Title, post.Content, post.ID).
+		WillReturnError(errors.New("failed to update post"))
+
+	// Вызов метода
+	result, err := postRepo.UpdatePost(context.Background(), post)
+
+	// Проверка результата
+	assert.Error(t, err)
+	assert.Nil(t, result)
+
+	// Проверка вызовов моков
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestPostRepository_DeletePost_Success(t *testing.T) {
+	// Инициализация логгера
+	logger, _ := zap.NewProduction()
+
+	// Создание моков
+	db, mock, err := sqlmock.New()
+	assert.NoError(t, err)
+	defer db.Close()
+
+	// Создание адаптера
+	dbAdapter := &adapters.DbAdapter{DB: db}
+
+	// Инициализация репозитория
+	postRepo := NewPostRepository(dbAdapter, logger)
+
+	// Тестовые данные
+	postID := 1
+
+	// Настройка моков
+	mock.ExpectExec(`DELETE FROM posts WHERE id = \?`).
+		WithArgs(postID).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+
+	// Вызов метода
+	err = postRepo.DeletePost(context.Background(), postID)
+
+	// Проверка результата
+	assert.NoError(t, err)
+
+	// Проверка вызовов моков
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestPostRepository_DeletePost_Failure(t *testing.T) {
+	// Инициализация логгера
+	logger, _ := zap.NewProduction()
+
+	// Создание моков
+	db, mock, err := sqlmock.New()
+	assert.NoError(t, err)
+	defer db.Close()
+
+	// Создание адаптера
+	dbAdapter := &adapters.DbAdapter{DB: db}
+
+	// Инициализация репозитория
+	postRepo := NewPostRepository(dbAdapter, logger)
+
+	// Тестовые данные
+	postID := 1
+
+	// Настройка моков
+	mock.ExpectExec(`DELETE FROM posts WHERE id = \?`).
+		WithArgs(postID).
+		WillReturnError(errors.New("failed to delete post"))
+
+	// Вызов метода
+	err = postRepo.DeletePost(context.Background(), postID)
+
+	// Проверка результата
+	assert.Error(t, err)
+
+	// Проверка вызовов моков
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestPostRepository_GetUserIDByToken_Success(t *testing.T) {
+	// Инициализация логгера
+	logger, _ := zap.NewProduction()
+
+	// Создание моков
+	db, mock, err := sqlmock.New()
+	assert.NoError(t, err)
+	defer db.Close()
+
+	// Создание адаптера
+	dbAdapter := &adapters.DbAdapter{DB: db}
+
+	// Инициализация репозитория
+	postRepo := NewPostRepository(dbAdapter, logger)
+
+	// Тестовые данные
+	token := "test-token"
+	userID := 1
+
+	// Настройка моков
+	rows := sqlmock.NewRows([]string{"user_id"}).AddRow(userID)
+	mock.ExpectQuery(`SELECT user_id FROM tokens WHERE token = \?`).
+		WithArgs(token).
+		WillReturnRows(rows)
+
+	// Вызов метода
+	result, err := postRepo.GetUserIDByToken(context.Background(), token)
+
+	// Проверка результата
+	assert.NoError(t, err)
+	assert.Equal(t, userID, result)
+
+	// Проверка вызовов моков
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestPostRepository_GetUserIDByToken_Failure(t *testing.T) {
+	// Инициализация логгера
+	logger, _ := zap.NewProduction()
+
+	// Создание моков
+	db, mock, err := sqlmock.New()
+	assert.NoError(t, err)
+	defer db.Close()
+
+	// Создание адаптера
+	dbAdapter := &adapters.DbAdapter{DB: db}
+
+	// Инициализация репозитория
+	postRepo := NewPostRepository(dbAdapter, logger)
+
+	// Тестовые данные
+	token := "test-token"
+
+	// Настройка моков
+	mock.ExpectQuery(`SELECT user_id FROM tokens WHERE token = \?`).
+		WithArgs(token).
+		WillReturnError(errors.New("failed to get user ID by token"))
+
+	// Вызов метода
+	result, err := postRepo.GetUserIDByToken(context.Background(), token)
+
+	// Проверка результата
+	assert.Error(t, err)
+	assert.Equal(t, 0, result)
+
+	// Проверка вызовов моков
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
