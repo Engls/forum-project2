@@ -9,10 +9,11 @@ import (
 
 type PostUsecase interface {
 	CreatePost(ctx context.Context, post entity.Post) (*entity.Post, error)
-	GetPosts(ctx context.Context) ([]entity.Post, error)
+	GetPosts(ctx context.Context, limit, offset int) ([]entity.Post, error)
 	GetPostByID(ctx context.Context, id int) (*entity.Post, error)
 	UpdatePost(ctx context.Context, post entity.Post) (*entity.Post, error)
 	DeletePost(ctx context.Context, id int) error
+	GetTotalPostsCount(ctx context.Context) (int, error)
 }
 
 type postUsecase struct {
@@ -41,17 +42,12 @@ func (u *postUsecase) CreatePost(ctx context.Context, post entity.Post) (*entity
 	return createdPost, nil
 }
 
-func (u *postUsecase) GetPosts(ctx context.Context) ([]entity.Post, error) {
-	u.logger.Info("Fetching all posts")
+func (u *postUsecase) GetPosts(ctx context.Context, limit, offset int) ([]entity.Post, error) {
+	return u.postRepo.GetPosts(ctx, limit, offset)
+}
 
-	posts, err := u.postRepo.GetPosts(ctx)
-	if err != nil {
-		u.logger.Error("Failed to get posts", zap.Error(err))
-		return nil, err
-	}
-
-	u.logger.Info("Posts fetched successfully", zap.Int("count", len(posts)))
-	return posts, nil
+func (u *postUsecase) GetTotalPostsCount(ctx context.Context) (int, error) {
+	return u.postRepo.GetTotalPostsCount(ctx)
 }
 
 func (u *postUsecase) GetPostByID(ctx context.Context, id int) (*entity.Post, error) {

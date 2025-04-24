@@ -14,7 +14,7 @@ import (
 
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
-		return true // В продакшене заменить на проверку origin
+		return true
 	},
 }
 
@@ -75,7 +75,7 @@ func (h *ChatHandler) ServeWS(c *gin.Context) {
 		UserID:          userID,
 		Username:        username,
 		IsAuthenticated: isAuthenticated,
-		ChatUC:          h.chatUC, // Передаем usecase в клиент
+		ChatUC:          h.chatUC,
 	}
 
 	h.hub.Register <- client

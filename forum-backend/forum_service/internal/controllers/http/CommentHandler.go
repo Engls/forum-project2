@@ -2,6 +2,7 @@ package http
 
 import (
 	utils "github.com/Engls/EnglsJwt"
+	"github.com/Engls/forum-project2/forum_service/internal/controllers/grpc"
 	"github.com/Engls/forum-project2/forum_service/internal/entity"
 	"github.com/Engls/forum-project2/forum_service/internal/usecase"
 	"github.com/gin-gonic/gin"
@@ -15,10 +16,11 @@ type CommentHandler struct {
 	commentUsecase usecase.CommentsUsecases
 	jwtUtil        *utils.JWTUtil
 	logger         *zap.Logger
+	userClient     *grpc.UserClient
 }
 
-func NewCommentHandler(commentUsecase usecase.CommentsUsecases, jwtUtil *utils.JWTUtil, logger *zap.Logger) *CommentHandler {
-	return &CommentHandler{commentUsecase: commentUsecase, jwtUtil: jwtUtil, logger: logger}
+func NewCommentHandler(commentUsecase usecase.CommentsUsecases, jwtUtil *utils.JWTUtil, logger *zap.Logger, userClient *grpc.UserClient) *CommentHandler {
+	return &CommentHandler{commentUsecase: commentUsecase, jwtUtil: jwtUtil, logger: logger, userClient: userClient}
 }
 
 // CreateComment godoc
@@ -36,7 +38,7 @@ func NewCommentHandler(commentUsecase usecase.CommentsUsecases, jwtUtil *utils.J
 // @Failure 500 {object} entity.ErrorResponse
 // @Router /posts/{id}/comments [post]
 func (h *CommentHandler) CreateComment(c *gin.Context) {
-	postIDStr := c.Param("id") // Получаем ID поста из URL
+	postIDStr := c.Param("id")
 	postID, err := strconv.Atoi(postIDStr)
 	if err != nil {
 		h.logger.Error("Invalid post ID", zap.Error(err))
@@ -65,7 +67,6 @@ func (h *CommentHandler) CreateComment(c *gin.Context) {
 		return
 	}
 
-	// Получаем ID пользователя из токена
 	userID, err := h.jwtUtil.GetUserIDFromToken(tokenString)
 	if err != nil {
 		h.logger.Error("Invalid token or user ID", zap.Error(err))
@@ -74,7 +75,7 @@ func (h *CommentHandler) CreateComment(c *gin.Context) {
 	}
 
 	comment.PostId = postID
-	comment.AuthorId = userID // Устанавливаем AuthorId из userID
+	comment.AuthorId = userID
 
 	createdComment, err := h.commentUsecase.CreateComment(c.Request.Context(), comment)
 	if err != nil {
@@ -87,33 +88,64 @@ func (h *CommentHandler) CreateComment(c *gin.Context) {
 	c.JSON(http.StatusCreated, createdComment)
 }
 
-// GetCommentsByPostID godoc
-// @Summary Получить комментарии поста
-// @Description Возвращает все комментарии для указанного поста
+// GetComments returns paginated comments for a post
+// @Summary Получить комментарии
+// @Description Получить комментарии
 // @Tags Комментарии
 // @Accept json
 // @Produce json
-// @Param id path int true "ID поста"
-// @Success 200 {array} entity.Comment
-// @Failure 400 {object} entity.ErrorResponse
-// @Failure 500 {object} entity.ErrorResponse
-// @Router /posts/{id}/comments [get]
-func (h *CommentHandler) GetCommentsByPostID(c *gin.Context) {
-	postIDStr := c.Param("id")
-	postID, err := strconv.Atoi(postIDStr)
+// @Param post_id path int true "Post ID"
+// @Param page query int false "Page number" default(1)
+// @Param limit query int false "Items per page" default(10)
+// @Success 200 {object} map[string]interface{} "comments and pagination info"
+// @Router /posts/{post_id}/comments [get]
+func (h *CommentHandler) GetComments(c *gin.Context) {
+	postID, err := strconv.Atoi(c.Param("post_id"))
 	if err != nil {
-		h.logger.Error("Invalid post ID", zap.Error(err))
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Invalid post ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid post ID"})
 		return
 	}
 
-	comments, err := h.commentUsecase.GetCommentByPostID(c.Request.Context(), postID)
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+	offset := (page - 1) * limit
+
+	comments, err := h.commentUsecase.GetComments(c.Request.Context(), postID, limit, offset)
 	if err != nil {
-		h.logger.Error("Failed to get comments", zap.Error(err))
-		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	h.logger.Info("Comments retrieved successfully", zap.Int("postID", postID))
-	c.JSON(http.StatusOK, comments)
+	total, err := h.commentUsecase.GetTotalCommentsCount(c.Request.Context(), postID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	commentsWithUsernames := make([]map[string]interface{}, len(comments))
+	for i, comment := range comments {
+		username, err := h.userClient.GetUsername(c.Request.Context(), comment.AuthorId)
+		if err != nil {
+			h.logger.Warn("Failed to get username",
+				zap.Int("userID", comment.AuthorId),
+				zap.Error(err))
+			username = "" // Используем пустое имя, если не удалось получить
+		}
+
+		commentsWithUsernames[i] = map[string]interface{}{
+			"id":        comment.ID,
+			"author_id": comment.AuthorId,
+			"post_id":   comment.PostId,
+			"content":   comment.Content,
+			"username":  username, // Добавляем имя пользователя
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"comments": commentsWithUsernames,
+		"pagination": gin.H{
+			"page":  page,
+			"limit": limit,
+			"total": total,
+		},
+	})
 }

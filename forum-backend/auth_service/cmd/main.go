@@ -2,7 +2,13 @@ package main
 
 import (
 	utils "github.com/Engls/EnglsJwt"
+	mygrpc "github.com/Engls/forum-project2/auth_service/internal/delivery/grpc"
+	"google.golang.org/grpc"
+
+	user "github.com/Engls/forum-project2/auth_service/internal/proto"
 	"github.com/gin-contrib/cors"
+	"log"
+	"net"
 	"time"
 
 	_ "github.com/Engls/forum-project2/auth_service/docs"
@@ -28,11 +34,10 @@ import (
 // @BasePath /
 
 func main() {
-	// Инициализация логгера
+
 	utils.InitLogger()
 	logger := utils.GetLogger()
 
-	// Загрузка конфигурации
 	cfg, err := config.LoadConfig()
 	if err != nil {
 		logger.Fatal("Failed to load config", zap.Error(err))
@@ -45,7 +50,6 @@ func main() {
 		zap.String("JWT_SECRET", cfg.JWTSecret),
 	)
 
-	// Подключение к базе данных
 	db, err := sqlx.Open("sqlite3", cfg.DBPath)
 	if err != nil {
 		logger.Fatal("Failed to connect to database", zap.Error(err))
@@ -56,13 +60,11 @@ func main() {
 		logger.Fatal("Failed to ping database", zap.Error(err))
 	}
 
-	// Создание драйвера для миграций
 	driver, err := sqlite3.WithInstance(db.DB, &sqlite3.Config{})
 	if err != nil {
 		logger.Fatal("Failed to create migrate driver", zap.Error(err))
 	}
 
-	// Применение миграций
 	m, err := migrate.NewWithDatabaseInstance(
 		"file://"+cfg.MigrationsPath,
 		"sqlite3", driver)
@@ -74,13 +76,27 @@ func main() {
 	}
 	logger.Info("Migrations applied successfully")
 
-	// Инициализация репозитория, usecase и обработчика
 	userRepo := repository.NewAuthRepository(db, logger)
+	userServer := mygrpc.NewUserServer(userRepo)
+
+	grpcServer := grpc.NewServer()
+	user.RegisterUserServiceServer(grpcServer, userServer)
+
+	// Запускаем gRPC сервер
+	go func() {
+		lis, err := net.Listen("tcp", ":50052")
+		if err != nil {
+			log.Fatal(err)
+		}
+		log.Println("gRPC user server started on :50052")
+		if err := grpcServer.Serve(lis); err != nil {
+			log.Fatal(err)
+		}
+	}()
 	jwtUtil := utils.NewJWTUtil(cfg.JWTSecret)
 	userUsecase := usecase.NewAuthUsecase(userRepo, jwtUtil, logger)
 	authHandler := http.NewAuthHandler(userUsecase, jwtUtil, logger)
 
-	// Настройка маршрутизатора
 	router := gin.Default()
 	router.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"http://localhost:3000"},
@@ -94,7 +110,7 @@ func main() {
 	router.POST("/login", authHandler.Login)
 
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
-	// Запуск сервера
+
 	if err := router.Run(cfg.Port); err != nil {
 		logger.Fatal("Failed to start server", zap.Error(err))
 	}

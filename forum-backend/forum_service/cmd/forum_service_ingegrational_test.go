@@ -24,20 +24,18 @@ import (
 )
 
 func setupTestDB(t *testing.T) *sqlx.DB {
-	// Создаем временный файл для базы данных
+
 	tmpfile, err := os.CreateTemp("", "testdb-*.db")
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %s", err)
 	}
 	defer tmpfile.Close()
 
-	// Открываем соединение с базой данных
 	db, err := sqlx.Open("sqlite3", tmpfile.Name())
 	if err != nil {
 		t.Fatalf("Failed to open database: %s", err)
 	}
 
-	// Создаем таблицы
 	_, err = db.Exec(`
 		CREATE TABLE IF NOT EXISTS users (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -86,14 +84,12 @@ func setupTestDB(t *testing.T) *sqlx.DB {
 }
 
 func TestForumService_Integration(t *testing.T) {
-	// Инициализация логгера
+
 	logger, _ := zap.NewProduction()
 
-	// Настройка тестовой базы данных
 	db := setupTestDB(t)
 	defer db.Close()
 
-	// Инициализация репозиториев, usecase и хендлеров
 	postRepo := repository.NewPostRepository(db, logger)
 	commentRepo := repository.NewCommentsRepository(db, logger)
 	chatRepo := repository.NewChatRepository(db, logger)
@@ -107,7 +103,6 @@ func TestForumService_Integration(t *testing.T) {
 	commentHandler := http2.NewCommentHandler(commentUsecase, jwtUtil, logger)
 	chatHandler := http2.NewChatHandler(hub, chatUsecase, jwtUtil, logger)
 
-	// Создание Gin роутера
 	router := gin.Default()
 	router.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"http://localhost:3000"},
@@ -125,19 +120,16 @@ func TestForumService_Integration(t *testing.T) {
 	router.POST("/posts/:id/comments", commentHandler.CreateComment)
 	router.GET("/posts/:id/comments", commentHandler.GetCommentsByPostID)
 
-	// Генерация токена для тестов
 	token, err := jwtUtil.GenerateToken(1, "user")
 	if err != nil {
 		t.Fatalf("Failed to generate token: %s", err)
 	}
 
-	// Сохранение токена в базе данных
 	_, err = db.Exec("INSERT INTO tokens (user_id, token) VALUES (?, ?)", 1, token)
 	if err != nil {
 		t.Fatalf("Failed to save token: %s", err)
 	}
 
-	// Тест создания поста
 	t.Run("CreatePost", func(t *testing.T) {
 		reqBody := entity.Post{
 			AuthorId: 1,
@@ -156,7 +148,6 @@ func TestForumService_Integration(t *testing.T) {
 		assert.Contains(t, w.Body.String(), "This is a test post")
 	})
 
-	// Тест получения постов
 	t.Run("GetPosts", func(t *testing.T) {
 		w := httptest.NewRecorder()
 		req, _ := http.NewRequest(http.MethodGet, "/posts", nil)
@@ -167,7 +158,6 @@ func TestForumService_Integration(t *testing.T) {
 		assert.Contains(t, w.Body.String(), "Test Post")
 	})
 
-	// Тест создания комментария
 	t.Run("CreateComment", func(t *testing.T) {
 		reqBody := entity.Comment{
 			PostId:   1,
@@ -186,7 +176,6 @@ func TestForumService_Integration(t *testing.T) {
 		assert.Contains(t, w.Body.String(), "This is a test comment")
 	})
 
-	// Тест получения комментариев
 	t.Run("GetCommentsByPostID", func(t *testing.T) {
 		w := httptest.NewRecorder()
 		req, _ := http.NewRequest(http.MethodGet, "/posts/1/comments", nil)

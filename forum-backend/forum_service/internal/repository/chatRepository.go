@@ -65,7 +65,6 @@ func (r *chatRepo) GetRecentMessages(ctx context.Context, limit int) ([]entity.C
 		return nil, err
 	}
 
-	// Reverse the order of messages to have the oldest first
 	for i, j := 0, len(messages)-1; i < j; i, j = i+1, j-1 {
 		messages[i], messages[j] = messages[j], messages[i]
 	}

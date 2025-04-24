@@ -9,7 +9,8 @@ import (
 
 type CommentsUsecases interface {
 	CreateComment(ctx context.Context, comment entity.Comment) (entity.Comment, error)
-	GetCommentByPostID(ctx context.Context, postId int) ([]entity.Comment, error)
+	GetComments(ctx context.Context, postID, limit, offset int) ([]entity.Comment, error)
+	GetTotalCommentsCount(ctx context.Context, postID int) (int, error)
 }
 
 type commentsUsecases struct {
@@ -38,15 +39,10 @@ func (u *commentsUsecases) CreateComment(ctx context.Context, comment entity.Com
 	return createdComment, nil
 }
 
-func (u *commentsUsecases) GetCommentByPostID(ctx context.Context, postId int) ([]entity.Comment, error) {
-	u.logger.Info("Fetching comments by post ID", zap.Int("postID", postId))
+func (u *commentsUsecases) GetComments(ctx context.Context, postID, limit, offset int) ([]entity.Comment, error) {
+	return u.commentRepo.GetComments(ctx, postID, limit, offset)
+}
 
-	comments, err := u.commentRepo.GetCommentsByPostID(ctx, postId)
-	if err != nil {
-		u.logger.Error("Failed to get comments by post ID", zap.Error(err), zap.Int("postID", postId))
-		return nil, err
-	}
-
-	u.logger.Info("Comments fetched successfully", zap.Int("postID", postId), zap.Int("count", len(comments)))
-	return comments, nil
+func (u *commentsUsecases) GetTotalCommentsCount(ctx context.Context, postID int) (int, error) {
+	return u.commentRepo.GetTotalCommentsCount(ctx, postID)
 }

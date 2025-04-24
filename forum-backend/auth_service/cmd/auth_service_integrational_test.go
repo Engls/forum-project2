@@ -20,20 +20,17 @@ import (
 )
 
 func setupTestDB(t *testing.T) *sqlx.DB {
-	// Создаем временный файл для базы данных
 	tmpfile, err := os.CreateTemp("", "testdb-*.db")
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %s", err)
 	}
 	defer tmpfile.Close()
 
-	// Открываем соединение с базой данных
 	db, err := sqlx.Open("sqlite3", tmpfile.Name())
 	if err != nil {
 		t.Fatalf("Failed to open database: %s", err)
 	}
 
-	// Создаем таблицы
 	_, err = db.Exec(`
 		CREATE TABLE users (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -56,25 +53,21 @@ func setupTestDB(t *testing.T) *sqlx.DB {
 }
 
 func TestAuthService_Integration(t *testing.T) {
-	// Инициализация логгера
+
 	logger, _ := zap.NewProduction()
 
-	// Настройка тестовой базы данных
 	db := setupTestDB(t)
 	defer db.Close()
 
-	// Инициализация репозитория, usecase и хендлера
 	authRepo := repository.NewAuthRepository(db, logger)
 	jwtUtil := EnglsJwt.NewJWTUtil("secret")
 	authUsecase := usecase.NewAuthUsecase(authRepo, jwtUtil, logger)
 	authHandler := http2.NewAuthHandler(authUsecase, jwtUtil, logger)
 
-	// Создание Gin роутера
 	r := gin.Default()
 	r.POST("/register", authHandler.Register)
 	r.POST("/login", authHandler.Login)
 
-	// Тест регистрации пользователя
 	t.Run("RegisterUser", func(t *testing.T) {
 		reqBody := entity.RegisterRequest{
 			Username: "testuser",
@@ -92,7 +85,6 @@ func TestAuthService_Integration(t *testing.T) {
 		assert.Contains(t, w.Body.String(), "User registered successfully")
 	})
 
-	// Тест входа пользователя
 	t.Run("LoginUser", func(t *testing.T) {
 		reqBody := entity.LoginRequest{
 			Username: "testuser",

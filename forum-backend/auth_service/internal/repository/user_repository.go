@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"database/sql"
 	"github.com/Engls/forum-project2/auth_service/internal/entity"
 	"go.uber.org/zap"
@@ -9,12 +10,14 @@ import (
 type DB interface {
 	Exec(query string, args ...any) (sql.Result, error)
 	Get(dest interface{}, query string, args ...interface{}) error
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
 }
 
 type AuthRepository interface {
 	Register(user entity.User) error
 	GetUserByUsername(username string) (entity.User, error)
 	SaveToken(userID int, token string) error
+	GetUsernameByID(ctx context.Context, userID int) (string, error)
 }
 
 type authRepository struct {
@@ -55,4 +58,16 @@ func (r *authRepository) SaveToken(userID int, token string) error {
 	}
 	r.logger.Info("Token saved successfully", zap.Int("userID", userID))
 	return nil
+}
+
+func (r *authRepository) GetUsernameByID(ctx context.Context, userID int) (string, error) {
+	var username string
+	err := r.db.QueryRowContext(ctx, "SELECT username FROM users WHERE id = $1", userID).Scan(&username)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return "", nil
+		}
+		return "", err
+	}
+	return username, nil
 }

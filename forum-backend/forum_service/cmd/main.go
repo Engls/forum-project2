@@ -5,6 +5,7 @@ import (
 	_ "github.com/Engls/forum-project2/forum_service/docs"
 	"github.com/Engls/forum-project2/forum_service/internal/config"
 	"github.com/Engls/forum-project2/forum_service/internal/controllers/chat"
+	"github.com/Engls/forum-project2/forum_service/internal/controllers/grpc"
 	"github.com/Engls/forum-project2/forum_service/internal/controllers/http"
 	"github.com/Engls/forum-project2/forum_service/internal/repository"
 	"github.com/Engls/forum-project2/forum_service/internal/usecase"
@@ -16,20 +17,20 @@ import (
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 	"go.uber.org/zap"
+	"log"
 	"time"
 )
 
 // @title Forum Service API
-// @version 1.0
+// @version 1.2
 // @description This is the API documentation for the Auth Service.
 // @host localhost:8081
 // @BasePath /
 func main() {
-	// Инициализация логгера
+
 	utils.InitLogger()
 	logger := utils.GetLogger()
 
-	// Загрузка конфигурации
 	cfg, err := config.LoadConfig()
 	if err != nil {
 		logger.Fatal("Failed to load config", zap.Error(err))
@@ -41,14 +42,18 @@ func main() {
 		zap.String("JWT_SECRET", cfg.JWTSecret),
 	)
 
-	// Подключение к базе данных
 	db, err := sqlx.Open("sqlite3", cfg.DBPath)
 	if err != nil {
 		logger.Fatal("Failed to connect to database", zap.Error(err))
 	}
 	defer db.Close()
 
-	// Инициализация репозиториев и usecase
+	userClient, err := grpc.NewUserClient("localhost:50052") // Или localhost для тестов
+	if err != nil {
+		log.Fatalf("Failed to create user client: %v", err)
+	}
+	defer userClient.Close()
+
 	postRepo := repository.NewPostRepository(db, logger)
 	commentRepo := repository.NewCommentsRepository(db, logger)
 	chatRepo := repository.NewChatRepository(db, logger)
@@ -58,15 +63,12 @@ func main() {
 	chatUsecase := usecase.NewChatUsecase(chatRepo, logger)
 	jwtUtil := utils.NewJWTUtil(cfg.JWTSecret)
 
-	// Инициализация обработчиков
-	postHandler := http.NewPostHandler(postUsecase, postRepo, jwtUtil, logger)
-	commentHandler := http.NewCommentHandler(commentUsecase, jwtUtil, logger)
+	postHandler := http.NewPostHandler(postUsecase, postRepo, jwtUtil, logger, userClient)
+	commentHandler := http.NewCommentHandler(commentUsecase, jwtUtil, logger, userClient)
 	chatHandler := http.NewChatHandler(hub, chatUsecase, jwtUtil, logger)
 
-	// Запуск хаба
 	go hub.Run()
 
-	// Настройка маршрутизатора
 	router := gin.Default()
 	router.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"http://localhost:3000"},
@@ -82,10 +84,11 @@ func main() {
 	router.GET("/posts", postHandler.GetPosts)
 	router.DELETE("/posts/:id", postHandler.DeletePost)
 	router.POST("/posts/:id/comments", commentHandler.CreateComment)
-	router.GET("/posts/:id/comments", commentHandler.GetCommentsByPostID)
+	router.GET("/posts/:post_id/comments", commentHandler.GetComments)
+	router.PUT("/posts/:id", postHandler.UpdatePost)
 
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
-	// Запуск сервера
+
 	if err := router.Run(cfg.Port); err != nil {
 		logger.Fatal("Failed to start server", zap.Error(err))
 	}

@@ -8,7 +8,8 @@ import (
 
 type CommentsRepository interface {
 	CreateComment(ctx context.Context, comment entity.Comment) (entity.Comment, error)
-	GetCommentsByPostID(ctx context.Context, postID int) ([]entity.Comment, error)
+	GetComments(ctx context.Context, postID, limit, offset int) ([]entity.Comment, error)
+	GetTotalCommentsCount(ctx context.Context, postID int) (int, error)
 }
 
 type commentsRepository struct {
@@ -35,16 +36,16 @@ func (r *commentsRepository) CreateComment(ctx context.Context, comment entity.C
 	return comment, nil
 }
 
-func (r *commentsRepository) GetCommentsByPostID(ctx context.Context, postID int) ([]entity.Comment, error) {
+func (r *commentsRepository) GetComments(ctx context.Context, postID, limit, offset int) ([]entity.Comment, error) {
 	query := `
-		SELECT id, post_id, author_id, content, created_at
-		FROM comments
-		WHERE post_id = $1
-		ORDER BY created_at ASC
-	`
-	rows, err := r.db.QueryContext(ctx, query, postID)
+        SELECT id, content, author_id, post_id, created_at 
+        FROM comments 
+        WHERE post_id = $1 
+        ORDER BY created_at DESC 
+        LIMIT $2 OFFSET $3
+    `
+	rows, err := r.db.QueryContext(ctx, query, postID, limit, offset)
 	if err != nil {
-		r.logger.Error("Failed to get comments by post ID", zap.Error(err), zap.Int("postID", postID))
 		return nil, err
 	}
 	defer rows.Close()
@@ -52,17 +53,23 @@ func (r *commentsRepository) GetCommentsByPostID(ctx context.Context, postID int
 	var comments []entity.Comment
 	for rows.Next() {
 		var comment entity.Comment
-		err := rows.Scan(&comment.ID, &comment.PostId, &comment.AuthorId, &comment.Content, &comment.CreatedAt)
-		if err != nil {
-			r.logger.Error("Failed to scan comment", zap.Error(err), zap.Int("postID", postID))
+		if err := rows.Scan(
+			&comment.ID,
+			&comment.Content,
+			&comment.AuthorId,
+			&comment.PostId,
+			&comment.CreatedAt,
+		); err != nil {
 			return nil, err
 		}
 		comments = append(comments, comment)
 	}
-	if err := rows.Err(); err != nil {
-		r.logger.Error("Error occurred while iterating over comments", zap.Error(err), zap.Int("postID", postID))
-		return nil, err
-	}
-	r.logger.Info("Comments retrieved successfully", zap.Int("postID", postID), zap.Int("count", len(comments)))
 	return comments, nil
+}
+
+func (r *commentsRepository) GetTotalCommentsCount(ctx context.Context, postID int) (int, error) {
+	var count int
+	query := `SELECT COUNT(*) FROM comments WHERE post_id = $1`
+	err := r.db.QueryRowContext(ctx, query, postID).Scan(&count)
+	return count, err
 }

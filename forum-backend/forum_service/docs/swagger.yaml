@@ -39,27 +39,33 @@ info:
   contact: {}
   description: This is the API documentation for the Auth Service.
   title: Forum Service API
-  version: "1.0"
+  version: "1.2"
 paths:
   /posts:
     get:
       consumes:
       - application/json
-      description: Возвращает список всех постов в системе
+      description: Получить посты с юзернеймами
+      parameters:
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: Items per page
+        in: query
+        name: limit
+        type: integer
       produces:
       - application/json
       responses:
         "200":
-          description: OK
+          description: posts with usernames and total count
           schema:
-            items:
-              $ref: '#/definitions/entity.Post'
-            type: array
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/entity.ErrorResponse'
-      summary: Получить все посты
+            additionalProperties: true
+            type: object
+      summary: Получить посты
       tags:
       - Посты
     post:
@@ -138,37 +144,50 @@ paths:
       summary: Удалить пост
       tags:
       - Посты
-  /posts/{id}/comments:
-    get:
+    put:
       consumes:
       - application/json
-      description: Возвращает все комментарии для указанного поста
+      description: Редактировать пост(если ты админ или владелец поста)
       parameters:
-      - description: ID поста
+      - description: Post ID
         in: path
         name: id
         required: true
         type: integer
+      - description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Post data
+        in: body
+        name: post
+        required: true
+        schema:
+          $ref: '#/definitions/entity.Post'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/entity.Comment'
-            type: array
+            $ref: '#/definitions/entity.Post'
         "400":
           description: Bad Request
+          schema:
+            $ref: '#/definitions/entity.ErrorResponse'
+        "403":
+          description: Forbidden
           schema:
             $ref: '#/definitions/entity.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/entity.ErrorResponse'
-      summary: Получить комментарии поста
+      summary: Редактировать пост
       tags:
-      - Комментарии
+      - Посты
+  /posts/{id}/comments:
     post:
       consumes:
       - application/json
@@ -207,6 +226,38 @@ paths:
       security:
       - BearerAuth: []
       summary: Создать новый комментарий
+      tags:
+      - Комментарии
+  /posts/{post_id}/comments:
+    get:
+      consumes:
+      - application/json
+      description: Получить комментарии
+      parameters:
+      - description: Post ID
+        in: path
+        name: post_id
+        required: true
+        type: integer
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: Items per page
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: comments and pagination info
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Получить комментарии
       tags:
       - Комментарии
   /ws/chat:

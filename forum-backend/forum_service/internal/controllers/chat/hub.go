@@ -30,7 +30,6 @@ func (h *Hub) Run() {
 			log.Printf("[HUB] Registering new client: UserID=%d, Username=%s", client.UserID, client.Username)
 			h.Clients[client] = true
 
-			// Отправка истории сообщений
 			messages, err := client.ChatUC.GetRecentMessages(context.Background(), 50)
 			if err != nil {
 				log.Printf("[HUB] Error getting messages: %v", err)

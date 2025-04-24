@@ -13,11 +13,12 @@ type DBposts interface {
 
 type PostRepository interface {
 	CreatePost(ctx context.Context, post entity.Post) (*entity.Post, error)
-	GetPosts(ctx context.Context) ([]entity.Post, error)
+	GetPosts(ctx context.Context, limit, offset int) ([]entity.Post, error)
 	GetPostByID(ctx context.Context, id int) (*entity.Post, error)
 	UpdatePost(ctx context.Context, post entity.Post) (*entity.Post, error)
 	DeletePost(ctx context.Context, id int) error
 	GetUserIDByToken(ctx context.Context, token string) (int, error)
+	GetTotalPostsCount(ctx context.Context) (int, error)
 }
 
 type postRepository struct {
@@ -48,16 +49,29 @@ func (r *postRepository) CreatePost(ctx context.Context, post entity.Post) (*ent
 	return &post, nil
 }
 
-func (r *postRepository) GetPosts(ctx context.Context) ([]entity.Post, error) {
-	query := `SELECT id, author_id, title, content FROM posts`
-	var posts []entity.Post
-	err := r.db.SelectContext(ctx, &posts, query)
+func (r *postRepository) GetPosts(ctx context.Context, limit, offset int) ([]entity.Post, error) {
+	query := `SELECT id, title, content, author_id FROM posts ORDER BY created_at DESC LIMIT $1 OFFSET $2`
+	rows, err := r.db.QueryContext(ctx, query, limit, offset)
 	if err != nil {
-		r.logger.Error("Failed to get posts", zap.Error(err))
 		return nil, err
 	}
-	r.logger.Info("Posts retrieved successfully", zap.Int("count", len(posts)))
+	defer rows.Close()
+
+	var posts []entity.Post
+	for rows.Next() {
+		var post entity.Post
+		if err := rows.Scan(&post.ID, &post.Title, &post.Content, &post.AuthorId); err != nil {
+			return nil, err
+		}
+		posts = append(posts, post)
+	}
 	return posts, nil
+}
+
+func (r *postRepository) GetTotalPostsCount(ctx context.Context) (int, error) {
+	var count int
+	err := r.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM posts`).Scan(&count)
+	return count, err
 }
 
 func (r *postRepository) GetPostByID(ctx context.Context, id int) (*entity.Post, error) {
@@ -74,7 +88,7 @@ func (r *postRepository) GetPostByID(ctx context.Context, id int) (*entity.Post,
 
 func (r *postRepository) UpdatePost(ctx context.Context, post entity.Post) (*entity.Post, error) {
 	query := `UPDATE posts SET title = ?, content = ? WHERE id = ?`
-	_, err := r.db.ExecContext(ctx, query, post.Title, post.Content, post.ID)
+	_, err := r.db.ExecContext(ctx, query, post.Title, post.Content, post.ID) //TODO посмотреть что происходит при обновлении не сущ. записи
 	if err != nil {
 		r.logger.Error("Failed to update post", zap.Error(err), zap.Int("postID", post.ID))
 		return nil, err

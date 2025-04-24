@@ -19,7 +19,7 @@ func InitLogger() {
 	if err != nil {
 		panic(err)
 	}
-	defer Logger.Sync() // flushes buffer, if any
+	defer Logger.Sync()
 }
 
 func GetLogger() *zap.Logger {
